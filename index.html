@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camelot & BPM Song Search</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    min-height: 100vh;
+  }
+  .header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    padding: 28px 24px 20px;
+    text-align: center;
+    border-bottom: 1px solid #30363d;
+  }
+  .header h1 {
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    background: linear-gradient(90deg, #58a6ff, #bc8cff, #f778ba);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .header p { color: #8b949e; font-size: 13px; margin-bottom: 16px; }
+
+  /* API Key setup */
+  .api-setup {
+    max-width: 600px;
+    margin: 0 auto 16px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .api-setup label { font-size: 12px; color: #8b949e; }
+  .api-setup input {
+    background: #161b22;
+    border: 1px solid #30363d;
+    color: #e6edf3;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    width: 280px;
+    outline: none;
+  }
+  .api-setup input:focus { border-color: #58a6ff; }
+  .api-status {
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    display: inline-block;
+  }
+  .api-status.connected { background: #238636; color: #fff; }
+  .api-status.disconnected { background: #da3633; color: #fff; }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+  .tab {
+    background: #21262d;
+    color: #8b949e;
+    border: 1px solid #30363d;
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+  .tab:hover { color: #e6edf3; border-color: #484f58; }
+  .tab.active { background: #58a6ff; color: #fff; border-color: #58a6ff; }
+
+  /* Search panels */
+  .search-panel { display: none; }
+  .search-panel.active { display: block; }
+
+  .controls {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: end;
+  }
+  .control-group { display: flex; flex-direction: column; gap: 4px; }
+  .control-group label { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+  select, input[type="number"], input[type="text"] {
+    background: #161b22;
+    border: 1px solid #30363d;
+    color: #e6edf3;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  select:focus, input:focus { border-color: #58a6ff; }
+  select { min-width: 130px; cursor: pointer; }
+  input[type="number"] { width: 80px; }
+  input[type="text"] { width: 200px; }
+  .btn {
+    background: #238636;
+    color: #fff;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+  }
+  .btn:hover { background: #2ea043; }
+  .btn:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+  .btn-clear { background: #30363d; }
+  .btn-clear:hover { background: #484f58; }
+  .btn-blue { background: #1f6feb; }
+  .btn-blue:hover { background: #388bfd; }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+  .main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 20px 24px;
+  }
+
+  /* Loading / progress */
+  .loading-bar {
+    width: 100%;
+    height: 4px;
+    background: #21262d;
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 12px 0;
+    display: none;
+  }
+  .loading-bar.active { display: block; }
+  .loading-bar .fill {
+    height: 100%;
+    background: linear-gradient(90deg, #58a6ff, #bc8cff);
+    border-radius: 2px;
+    transition: width 0.3s;
+    width: 0%;
+  }
+  .loading-msg {
+    text-align: center;
+    font-size: 13px;
+    color: #8b949e;
+    margin: 8px 0;
+    display: none;
+  }
+  .loading-msg.active { display: block; }
+
+  .stats {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .stat {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 13px;
+  }
+  .stat strong { color: #58a6ff; }
+
+  .cache-info {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .cache-info strong { color: #58a6ff; }
+
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  th {
+    background: #161b22;
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    color: #8b949e;
+    position: sticky;
+    top: 0;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    border-bottom: 1px solid #30363d;
+  }
+  th:hover { color: #58a6ff; }
+  th .sort-arrow { margin-left: 4px; font-size: 10px; }
+  td {
+    padding: 8px 14px;
+    border-bottom: 1px solid #21262d;
+    white-space: nowrap;
+  }
+  tr:hover td { background: #161b22; }
+  .key-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 36px;
+    text-align: center;
+  }
+  .bpm-bar {
+    display: inline-block;
+    height: 6px;
+    border-radius: 3px;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  .popularity-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .popularity-bar .bar {
+    width: 60px;
+    height: 6px;
+    background: #21262d;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .popularity-bar .bar .fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #238636, #3fb950);
+  }
+  .no-results {
+    text-align: center;
+    padding: 40px 24px;
+    color: #8b949e;
+  }
+  .no-results h3 { font-size: 18px; margin-bottom: 8px; color: #e6edf3; }
+
+  .camelot-ref {
+    margin-top: 24px;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .camelot-ref summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    background: #161b22;
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .camelot-ref .ref-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 4px;
+    padding: 12px;
+  }
+  .ref-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
+  .ref-item:hover { background: #161b22; }
+  .credit {
+    text-align: center;
+    margin-top: 24px;
+    padding: 16px;
+    font-size: 12px;
+    color: #484f58;
+  }
+  .credit a { color: #58a6ff; text-decoration: none; }
+  .credit a:hover { text-decoration: underline; }
+
+  .hint-box {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 16px 0;
+    text-align: center;
+  }
+  .hint-box h3 { color: #58a6ff; margin-bottom: 8px; font-size: 16px; }
+  .hint-box p { color: #8b949e; font-size: 13px; line-height: 1.6; }
+  .hint-box code { background: #21262d; padding: 2px 6px; border-radius: 4px; color: #f0883e; font-size: 12px; }
+
+  @media (max-width: 768px) {
+    .controls { flex-direction: column; align-items: stretch; }
+    .control-group { width: 100%; }
+    select, input[type="number"], input[type="text"] { width: 100%; }
+    .header h1 { font-size: 22px; }
+    .api-setup input { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Camelot & BPM Song Search</h1>
+  <p>Live song data powered by GetSongBPM — accurate keys and tempos</p>
+
+  <div class="api-setup">
+    <label>API Key:</label>
+    <input type="password" id="apiKeyInput" placeholder="Paste your GetSongBPM API key" spellcheck="false">
+    <button class="btn btn-sm" onclick="saveApiKey()">Save</button>
+    <span class="api-status disconnected" id="apiStatus">No key</span>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="bpm" onclick="switchTab('bpm')">Search by BPM</div>
+    <div class="tab" data-tab="browse" onclick="switchTab('browse')">Browse Library</div>
+    <div class="tab" data-tab="lookup" onclick="switchTab('lookup')">Look Up Song</div>
+    <div class="tab" data-tab="build" onclick="switchTab('build')">Build Database</div>
+  </div>
+
+  <!-- BPM Search -->
+  <div class="search-panel active" id="panel-bpm">
+    <div class="controls">
+      <div class="control-group">
+        <label>BPM</label>
+        <input type="number" id="bpmSearch" placeholder="e.g. 128" min="40" max="220">
+      </div>
+      <div class="control-group">
+        <label>Filter by Key</label>
+        <select id="bpmKeyFilter">
+          <option value="">All Keys</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>Compatible Keys</label>
+        <select id="bpmCompatMode">
+          <option value="exact">Exact key only</option>
+          <option value="compatible">+1/-1 & A/B</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>&nbsp;</label>
+        <button class="btn" id="bpmSearchBtn" onclick="searchByBpm()">Search</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Browse cached library -->
+  <div class="search-panel" id="panel-browse">
+    <div class="controls">
+      <div class="control-group">
+        <label>Camelot Key</label>
+        <select id="browseKey">
+          <option value="">All Keys</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>Compatible Keys</label>
+        <select id="browseCompat">
+          <option value="exact">Exact key only</option>
+          <option value="compatible">+1/-1 & A/B</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>Min BPM</label>
+        <input type="number" id="browseMin" placeholder="e.g. 120" min="0" max="300">
+      </div>
+      <div class="control-group">
+        <label>Max BPM</label>
+        <input type="number" id="browseMax" placeholder="e.g. 140" min="0" max="300">
+      </div>
+      <div class="control-group">
+        <label>Search</label>
+        <input type="text" id="browseText" placeholder="Title or artist...">
+      </div>
+      <div class="control-group">
+        <label>&nbsp;</label>
+        <div style="display:flex;gap:6px;">
+          <button class="btn" onclick="browseCached()">Filter</button>
+          <button class="btn btn-clear" onclick="clearBrowse()">Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Look up a specific song -->
+  <div class="search-panel" id="panel-lookup">
+    <div class="controls">
+      <div class="control-group">
+        <label>Song Title</label>
+        <input type="text" id="lookupTitle" placeholder="e.g. Blinding Lights" style="width:240px">
+      </div>
+      <div class="control-group">
+        <label>Artist (optional)</label>
+        <input type="text" id="lookupArtist" placeholder="e.g. The Weeknd" style="width:200px">
+      </div>
+      <div class="control-group">
+        <label>&nbsp;</label>
+        <button class="btn" id="lookupBtn" onclick="lookupSong()">Look Up</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Build database by scanning BPM ranges -->
+  <div class="search-panel" id="panel-build">
+    <div class="controls">
+      <div class="control-group">
+        <label>BPM Range Start</label>
+        <input type="number" id="buildStart" value="60" min="40" max="220">
+      </div>
+      <div class="control-group">
+        <label>BPM Range End</label>
+        <input type="number" id="buildEnd" value="180" min="40" max="220">
+      </div>
+      <div class="control-group">
+        <label>Step</label>
+        <select id="buildStep">
+          <option value="1">Every 1 BPM (thorough)</option>
+          <option value="2" selected>Every 2 BPM (balanced)</option>
+          <option value="5">Every 5 BPM (fast)</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>&nbsp;</label>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-blue" id="buildBtn" onclick="buildDatabase()">Build Database</button>
+          <button class="btn btn-clear" id="buildStopBtn" onclick="stopBuild()" style="display:none">Stop</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="loading-bar" id="loadingBar"><div class="fill" id="loadingFill"></div></div>
+  <div class="loading-msg" id="loadingMsg"></div>
+
+  <div class="cache-info" id="cacheInfo">
+    <span>📦 Cached songs: <strong id="cacheCount">0</strong></span>
+    <span>🔑 Keys covered: <strong id="cacheKeys">0</strong>/24</span>
+    <span>🎵 BPM range: <strong id="cacheBpmRange">—</strong></span>
+    <button class="btn btn-sm btn-clear" onclick="exportCache()">Export JSON</button>
+    <label class="btn btn-sm btn-clear" style="cursor:pointer">Import JSON
+      <input type="file" accept=".json" onchange="importCache(event)" style="display:none">
+    </label>
+    <button class="btn btn-sm btn-clear" onclick="clearCache()" style="color:#da3633">Clear Cache</button>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div id="hintBox" class="hint-box" style="display:none;">
+    <h3>Getting Started</h3>
+    <p>
+      1. Paste your free API key from <a href="https://getsongbpm.com/api" target="_blank" style="color:#58a6ff">getsongbpm.com/api</a> above<br>
+      2. Use <strong>Search by BPM</strong> to find songs at a specific tempo<br>
+      3. Use <strong>Build Database</strong> to scan a BPM range and cache hundreds of songs with accurate Camelot keys<br>
+      4. Use <strong>Browse Library</strong> to filter your cached songs by key, BPM, or name<br>
+      5. Use <strong>Look Up Song</strong> to find the key/BPM of a specific track
+    </p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th onclick="sortBy('rank')"># <span class="sort-arrow" id="sort-rank"></span></th>
+          <th onclick="sortBy('title')">Title <span class="sort-arrow" id="sort-title"></span></th>
+          <th onclick="sortBy('artist')">Artist <span class="sort-arrow" id="sort-artist"></span></th>
+          <th onclick="sortBy('bpm')">BPM <span class="sort-arrow" id="sort-bpm"></span></th>
+          <th onclick="sortBy('camelot')">Camelot <span class="sort-arrow" id="sort-camelot"></span></th>
+          <th onclick="sortBy('musical_key')">Key <span class="sort-arrow" id="sort-musical_key"></span></th>
+          <th onclick="sortBy('year')">Year <span class="sort-arrow" id="sort-year"></span></th>
+          <th>Source</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+  <div id="noResults" class="no-results" style="display:none;">
+    <h3>No songs found</h3>
+    <p>Try a different search or build your database first</p>
+  </div>
+
+  <details class="camelot-ref">
+    <summary>Camelot Wheel Reference</summary>
+    <div class="ref-grid" id="refGrid"></div>
+  </details>
+
+  <div class="credit">
+    Song data powered by <a href="https://getsongbpm.com" target="_blank">GetSongBPM.com</a>
+  </div>
+</div>
+
+<script>
+// ============ CONSTANTS ============
+const API_BASE = 'https://api.getsong.co';
+
+const CAMELOT_MAP = {
+  '1A':'Ab min','1B':'B maj','2A':'Eb min','2B':'F# maj','3A':'Bb min','3B':'Db maj',
+  '4A':'F min','4B':'Ab maj','5A':'C min','5B':'Eb maj','6A':'G min','6B':'Bb maj',
+  '7A':'D min','7B':'F maj','8A':'A min','8B':'C maj','9A':'E min','9B':'G maj',
+  '10A':'B min','10B':'D maj','11A':'F# min','11B':'A maj','12A':'C# min','12B':'E maj'
+};
+
+const KEY_COLORS = {
+  '1A':'#e74c3c','1B':'#e67e22','2A':'#f39c12','2B':'#f1c40f',
+  '3A':'#2ecc71','3B':'#1abc9c','4A':'#16a085','4B':'#3498db',
+  '5A':'#2980b9','5B':'#8e44ad','6A':'#9b59b6','6B':'#e91e63',
+  '7A':'#c0392b','7B':'#d35400','8A':'#e67e22','8B':'#f39c12',
+  '9A':'#27ae60','9B':'#2ecc71','10A':'#1abc9c','10B':'#2980b9',
+  '11A':'#8e44ad','11B':'#9b59b6','12A':'#e91e63','12B':'#c0392b'
+};
+
+// Open Key notation → Camelot
+// open_key "2m" = "2A" (minor), "5d" = "5B" (major)
+function openKeyToCamelot(openKey) {
+  if (!openKey) return '';
+  const match = openKey.match(/^(\d+)(m|d)$/i);
+  if (!match) return '';
+  const num = match[1];
+  const letter = match[2].toLowerCase() === 'm' ? 'A' : 'B';
+  return `${num}${letter}`;
+}
+
+function getCompatibleKeys(key) {
+  if (!key) return [];
+  const num = parseInt(key);
+  const letter = key.slice(-1);
+  const otherLetter = letter === 'A' ? 'B' : 'A';
+  const prev = ((num - 2 + 12) % 12) + 1;
+  const next = (num % 12) + 1;
+  return [key, `${num}${otherLetter}`, `${prev}${letter}`, `${next}${letter}`];
+}
+
+// ============ STATE ============
+let apiKey = localStorage.getItem('getsongbpm_api_key') || '';
+let songCache = JSON.parse(localStorage.getItem('song_cache') || '{}'); // keyed by song_id
+let displaySongs = [];
+let currentSort = { field: 'bpm', dir: 1 };
+let buildRunning = false;
+
+// ============ API KEY ============
+function saveApiKey() {
+  apiKey = document.getElementById('apiKeyInput').value.trim();
+  if (apiKey) {
+    localStorage.setItem('getsongbpm_api_key', apiKey);
+    updateApiStatus(true);
+  }
+}
+
+function updateApiStatus(hasKey) {
+  const el = document.getElementById('apiStatus');
+  if (hasKey) {
+    el.textContent = 'Key saved ✓';
+    el.className = 'api-status connected';
+  } else {
+    el.textContent = 'No key';
+    el.className = 'api-status disconnected';
+  }
+}
+
+// ============ API CALLS ============
+async function apiCall(endpoint, params) {
+  if (!apiKey) {
+    alert('Please enter your GetSongBPM API key first!');
+    return null;
+  }
+  const url = new URL(`${API_BASE}${endpoint}`);
+  url.searchParams.set('api_key', apiKey);
+  for (const [k, v] of Object.entries(params)) {
+    url.searchParams.set(k, v);
+  }
+  try {
+    const res = await fetch(url.toString());
+    if (!res.ok) {
+      if (res.status === 429) {
+        showLoading('Rate limited — waiting 5s...', -1);
+        await sleep(5000);
+        return apiCall(endpoint, params);
+      }
+      throw new Error(`API error ${res.status}`);
+    }
+    return await res.json();
+  } catch (err) {
+    console.error('API call failed:', err);
+    return null;
+  }
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Fetch song details (key, open_key, etc.) and cache
+async function fetchSongDetails(songId) {
+  if (songCache[songId] && songCache[songId].camelot) return songCache[songId];
+  const data = await apiCall('/song/', { id: songId });
+  if (!data || !data.song) return null;
+  const s = data.song;
+  const camelot = openKeyToCamelot(s.open_key);
+  const entry = {
+    id: s.id,
+    title: s.title || 'Unknown',
+    artist: s.artist ? (s.artist.name || (Array.isArray(s.artist) ? s.artist.map(a=>a.name).join(', ') : '')) : 'Unknown',
+    bpm: parseInt(s.tempo) || 0,
+    camelot: camelot,
+    musical_key: s.key_of || '',
+    open_key: s.open_key || '',
+    year: s.album ? (s.album.year || 0) : 0,
+    album: s.album ? (s.album.title || '') : '',
+    source: 'api'
+  };
+  songCache[songId] = entry;
+  return entry;
+}
+
+// ============ SEARCH BY BPM ============
+async function searchByBpm() {
+  const bpm = parseInt(document.getElementById('bpmSearch').value);
+  if (!bpm || bpm < 40 || bpm > 220) {
+    alert('Enter a BPM between 40 and 220');
+    return;
+  }
+
+  document.getElementById('bpmSearchBtn').disabled = true;
+  showLoading(`Searching songs at ${bpm} BPM...`, 10);
+
+  const data = await apiCall('/tempo/', { bpm: bpm });
+  if (!data || !data.tempo || !data.tempo.length) {
+    hideLoading();
+    document.getElementById('bpmSearchBtn').disabled = false;
+    displaySongs = [];
+    render();
+    return;
+  }
+
+  const songs = data.tempo;
+  showLoading(`Found ${songs.length} songs. Fetching key data...`, 20);
+
+  // Fetch details for each song (with concurrency limit)
+  const results = [];
+  const batchSize = 8;
+  for (let i = 0; i < songs.length; i += batchSize) {
+    const batch = songs.slice(i, i + batchSize);
+    const promises = batch.map(s => fetchSongDetails(s.song_id));
+    const batchResults = await Promise.all(promises);
+    results.push(...batchResults.filter(Boolean));
+    const pct = 20 + Math.round((i / songs.length) * 70);
+    showLoading(`Fetching details... ${results.length}/${songs.length}`, pct);
+  }
+
+  saveCache();
+  showLoading('Done!', 100);
+
+  // Apply key filter if set
+  const keyFilter = document.getElementById('bpmKeyFilter').value;
+  const compat = document.getElementById('bpmCompatMode').value;
+  let validKeys = [];
+  if (keyFilter) {
+    validKeys = compat === 'compatible' ? getCompatibleKeys(keyFilter) : [keyFilter];
+  }
+
+  displaySongs = results.filter(s => {
+    if (validKeys.length && !validKeys.includes(s.camelot)) return false;
+    return true;
+  }).slice(0, 500);
+
+  currentSort = { field: 'bpm', dir: 1 };
+  render();
+  setTimeout(hideLoading, 500);
+  document.getElementById('bpmSearchBtn').disabled = false;
+}
+
+// ============ LOOK UP SONG ============
+async function lookupSong() {
+  const title = document.getElementById('lookupTitle').value.trim();
+  const artist = document.getElementById('lookupArtist').value.trim();
+  if (!title) {
+    alert('Enter a song title');
+    return;
+  }
+
+  document.getElementById('lookupBtn').disabled = true;
+  showLoading('Searching...', 30);
+
+  let lookup = title;
+  let params = { type: 'song', lookup: lookup };
+  if (artist) {
+    params.type = 'both';
+    params.lookup = `song:${title}&artist:${artist}`;
+  }
+
+  const data = await apiCall('/search/', params);
+  if (!data || !data.search) {
+    hideLoading();
+    document.getElementById('lookupBtn').disabled = false;
+    displaySongs = [];
+    render();
+    return;
+  }
+
+  const searchResults = data.search;
+  showLoading(`Found ${searchResults.length} matches. Getting details...`, 50);
+
+  const results = [];
+  const batchSize = 8;
+  for (let i = 0; i < searchResults.length; i += batchSize) {
+    const batch = searchResults.slice(i, i + batchSize);
+    const promises = batch.map(s => fetchSongDetails(s.id));
+    const batchResults = await Promise.all(promises);
+    results.push(...batchResults.filter(Boolean));
+  }
+
+  saveCache();
+  displaySongs = results.slice(0, 500);
+  currentSort = { field: 'title', dir: 1 };
+  render();
+  showLoading('Done!', 100);
+  setTimeout(hideLoading, 500);
+  document.getElementById('lookupBtn').disabled = false;
+}
+
+// ============ BROWSE CACHED ============
+function browseCached() {
+  const key = document.getElementById('browseKey').value;
+  const compat = document.getElementById('browseCompat').value;
+  const bpmMin = parseInt(document.getElementById('browseMin').value) || 0;
+  const bpmMax = parseInt(document.getElementById('browseMax').value) || 999;
+  const text = document.getElementById('browseText').value.toLowerCase().trim();
+
+  let validKeys = [];
+  if (key) {
+    validKeys = compat === 'compatible' ? getCompatibleKeys(key) : [key];
+  }
+
+  const allSongs = Object.values(songCache);
+  displaySongs = allSongs.filter(s => {
+    if (validKeys.length && !validKeys.includes(s.camelot)) return false;
+    if (s.bpm < bpmMin || s.bpm > bpmMax) return false;
+    if (text && !s.title.toLowerCase().includes(text) && !s.artist.toLowerCase().includes(text)) return false;
+    return true;
+  });
+
+  displaySongs.sort((a, b) => b.bpm - a.bpm);
+  displaySongs = displaySongs.slice(0, 500);
+  currentSort = { field: 'bpm', dir: -1 };
+  render();
+}
+
+function clearBrowse() {
+  document.getElementById('browseKey').value = '';
+  document.getElementById('browseCompat').value = 'exact';
+  document.getElementById('browseMin').value = '';
+  document.getElementById('browseMax').value = '';
+  document.getElementById('browseText').value = '';
+  browseCached();
+}
+
+// ============ BUILD DATABASE ============
+async function buildDatabase() {
+  const start = parseInt(document.getElementById('buildStart').value) || 60;
+  const end = parseInt(document.getElementById('buildEnd').value) || 180;
+  const step = parseInt(document.getElementById('buildStep').value) || 2;
+
+  if (start > end || start < 40 || end > 220) {
+    alert('Invalid BPM range. Use 40-220.');
+    return;
+  }
+
+  buildRunning = true;
+  document.getElementById('buildBtn').disabled = true;
+  document.getElementById('buildStopBtn').style.display = '';
+
+  const bpms = [];
+  for (let b = start; b <= end; b += step) bpms.push(b);
+
+  let totalFetched = 0;
+  let totalDetails = 0;
+
+  for (let i = 0; i < bpms.length; i++) {
+    if (!buildRunning) break;
+    const bpm = bpms[i];
+    const pct = Math.round((i / bpms.length) * 100);
+    showLoading(`Scanning BPM ${bpm} (${i+1}/${bpms.length})... ${totalDetails} songs catalogued`, pct);
+
+    const data = await apiCall('/tempo/', { bpm: bpm });
+    if (data && data.tempo) {
+      totalFetched += data.tempo.length;
+
+      // Fetch details for songs we haven't cached yet
+      const uncached = data.tempo.filter(s => !songCache[s.song_id] || !songCache[s.song_id].camelot);
+      const batchSize = 8;
+      for (let j = 0; j < uncached.length; j += batchSize) {
+        if (!buildRunning) break;
+        const batch = uncached.slice(j, j + batchSize);
+        await Promise.all(batch.map(s => fetchSongDetails(s.song_id)));
+        totalDetails = Object.keys(songCache).length;
+        showLoading(`BPM ${bpm} (${i+1}/${bpms.length}) — ${totalDetails} songs total`, pct);
+      }
+    }
+
+    // Save periodically
+    if (i % 5 === 0) saveCache();
+    // Small delay to be nice to the API
+    await sleep(100);
+  }
+
+  saveCache();
+  updateCacheInfo();
+  showLoading(`Done! ${Object.keys(songCache).length} songs catalogued.`, 100);
+  setTimeout(hideLoading, 2000);
+
+  buildRunning = false;
+  document.getElementById('buildBtn').disabled = false;
+  document.getElementById('buildStopBtn').style.display = 'none';
+
+  // Auto-show results
+  switchTab('browse');
+  browseCached();
+}
+
+function stopBuild() {
+  buildRunning = false;
+  document.getElementById('buildStopBtn').style.display = 'none';
+  document.getElementById('buildBtn').disabled = false;
+  saveCache();
+  updateCacheInfo();
+}
+
+// ============ CACHE MANAGEMENT ============
+function saveCache() {
+  try {
+    localStorage.setItem('song_cache', JSON.stringify(songCache));
+  } catch (e) {
+    console.warn('Cache too large for localStorage, trimming...');
+    // Keep only entries with camelot keys
+    const trimmed = {};
+    for (const [k, v] of Object.entries(songCache)) {
+      if (v.camelot) trimmed[k] = v;
+    }
+    songCache = trimmed;
+    localStorage.setItem('song_cache', JSON.stringify(songCache));
+  }
+  updateCacheInfo();
+}
+
+function updateCacheInfo() {
+  const songs = Object.values(songCache).filter(s => s.camelot);
+  document.getElementById('cacheCount').textContent = songs.length;
+  const keys = new Set(songs.map(s => s.camelot));
+  document.getElementById('cacheKeys').textContent = keys.size;
+  if (songs.length > 0) {
+    const bpms = songs.map(s => s.bpm).filter(b => b > 0);
+    if (bpms.length) {
+      document.getElementById('cacheBpmRange').textContent = `${Math.min(...bpms)} - ${Math.max(...bpms)}`;
+    }
+  }
+}
+
+function clearCache() {
+  if (confirm('Clear all cached song data? This cannot be undone.')) {
+    songCache = {};
+    localStorage.removeItem('song_cache');
+    updateCacheInfo();
+    displaySongs = [];
+    render();
+  }
+}
+
+function exportCache() {
+  const songs = Object.values(songCache).filter(s => s.camelot);
+  const blob = new Blob([JSON.stringify(songs, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `camelot-bpm-database-${songs.length}-songs.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importCache(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (Array.isArray(data)) {
+        data.forEach(s => {
+          if (s.id) songCache[s.id] = s;
+        });
+        saveCache();
+        alert(`Imported ${data.length} songs!`);
+      }
+    } catch (err) {
+      alert('Invalid JSON file');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ============ UI HELPERS ============
+function showLoading(msg, pct) {
+  const bar = document.getElementById('loadingBar');
+  const fill = document.getElementById('loadingFill');
+  const msgEl = document.getElementById('loadingMsg');
+  bar.classList.add('active');
+  msgEl.classList.add('active');
+  msgEl.textContent = msg;
+  if (pct >= 0) fill.style.width = pct + '%';
+}
+
+function hideLoading() {
+  document.getElementById('loadingBar').classList.remove('active');
+  document.getElementById('loadingMsg').classList.remove('active');
+  document.getElementById('loadingFill').style.width = '0%';
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.search-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`panel-${tab}`).classList.add('active');
+  if (tab === 'browse') browseCached();
+}
+
+// ============ SORTING ============
+function sortBy(field) {
+  if (field === 'rank') return;
+  if (currentSort.field === field) {
+    currentSort.dir *= -1;
+  } else {
+    currentSort.field = field;
+    currentSort.dir = field === 'bpm' || field === 'year' ? -1 : 1;
+  }
+  displaySongs.sort((a, b) => {
+    let va = a[field], vb = b[field];
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return -1 * currentSort.dir;
+    if (va > vb) return 1 * currentSort.dir;
+    return 0;
+  });
+  render();
+}
+
+// ============ RENDER ============
+function render() {
+  const tbody = document.getElementById('tableBody');
+  const noRes = document.getElementById('noResults');
+  const statsEl = document.getElementById('stats');
+  const hintBox = document.getElementById('hintBox');
+
+  // Update sort arrows
+  document.querySelectorAll('.sort-arrow').forEach(el => el.textContent = '');
+  const arrowEl = document.getElementById(`sort-${currentSort.field}`);
+  if (arrowEl) arrowEl.textContent = currentSort.dir === 1 ? '▲' : '▼';
+
+  if (!displaySongs.length) {
+    tbody.innerHTML = '';
+    noRes.style.display = 'block';
+    statsEl.innerHTML = '';
+    hintBox.style.display = Object.keys(songCache).length === 0 && !apiKey ? '' : 'none';
+    return;
+  }
+
+  noRes.style.display = 'none';
+  hintBox.style.display = 'none';
+
+  // Stats
+  const validBpms = displaySongs.filter(s => s.bpm > 0);
+  const avgBpm = validBpms.length ? Math.round(validBpms.reduce((s, x) => s + x.bpm, 0) / validBpms.length) : 0;
+  const keys = [...new Set(displaySongs.map(s => s.camelot).filter(Boolean))];
+  statsEl.innerHTML = `
+    <div class="stat"><strong>${displaySongs.length}</strong> songs</div>
+    ${avgBpm ? `<div class="stat">Avg BPM: <strong>${avgBpm}</strong></div>` : ''}
+    ${validBpms.length ? `<div class="stat">BPM range: <strong>${Math.min(...validBpms.map(s=>s.bpm))}</strong> - <strong>${Math.max(...validBpms.map(s=>s.bpm))}</strong></div>` : ''}
+    <div class="stat">Keys: <strong>${keys.length}</strong></div>
+  `;
+
+  let html = '';
+  displaySongs.forEach((s, i) => {
+    const color = KEY_COLORS[s.camelot] || '#58a6ff';
+    const bpmWidth = s.bpm ? Math.min((s.bpm / 220) * 60, 60) : 0;
+    html += `<tr>
+      <td style="color:#8b949e">${i + 1}</td>
+      <td><strong>${esc(s.title)}</strong></td>
+      <td style="color:#8b949e">${esc(s.artist)}</td>
+      <td><span class="bpm-bar" style="width:${bpmWidth}px;background:${color}"></span>${s.bpm || '—'}</td>
+      <td>${s.camelot ? `<span class="key-badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${s.camelot}</span>` : '—'}</td>
+      <td style="color:#8b949e">${esc(s.musical_key || '')}</td>
+      <td style="color:#8b949e">${s.year || '—'}</td>
+      <td style="color:#484f58;font-size:11px">${s.source === 'api' ? '✓ API' : 'cached'}</td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ============ INIT ============
+function populateKeyDropdowns() {
+  const selectors = ['bpmKeyFilter', 'browseKey'];
+  selectors.forEach(id => {
+    const sel = document.getElementById(id);
+    Object.entries(CAMELOT_MAP).forEach(([key, name]) => {
+      const opt = document.createElement('option');
+      opt.value = key;
+      opt.textContent = `${key} (${name})`;
+      sel.appendChild(opt);
+    });
+  });
+}
+
+function buildRefGrid() {
+  const grid = document.getElementById('refGrid');
+  let html = '';
+  Object.entries(CAMELOT_MAP).forEach(([key, name]) => {
+    const color = KEY_COLORS[key];
+    html += `<div class="ref-item">
+      <span class="key-badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${key}</span>
+      ${name}
+    </div>`;
+  });
+  grid.innerHTML = html;
+}
+
+// Enter key triggers search in all input fields
+document.querySelectorAll('input[type="number"], input[type="text"]').forEach(el => {
+  el.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    // Figure out which panel is active
+    const activePanel = document.querySelector('.search-panel.active');
+    if (!activePanel) return;
+    const id = activePanel.id;
+    if (id === 'panel-bpm') searchByBpm();
+    else if (id === 'panel-browse') browseCached();
+    else if (id === 'panel-lookup') lookupSong();
+  });
+});
+
+// Boot
+populateKeyDropdowns();
+buildRefGrid();
+updateApiStatus(!!apiKey);
+if (apiKey) {
+  document.getElementById('apiKeyInput').value = apiKey;
+}
+updateCacheInfo();
+
+// Show hint if no data
+if (Object.keys(songCache).length === 0) {
+  document.getElementById('hintBox').style.display = '';
+} else {
+  // Auto-browse
+  browseCached();
+}
+</script>
+</body>
+</html>
